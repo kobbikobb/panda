@@ -10,6 +10,8 @@ from telegram.ext import (
     filters,
 )
 
+from ollama_client import OllamaClient
+
 load_dotenv()
 
 
@@ -22,6 +24,8 @@ def _get_token() -> str:
 
 TOKEN = _get_token()
 
+ollama = OllamaClient()
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None:
@@ -29,19 +33,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Hello! I'm your panda assistant.")
 
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message is None:
         return
-    await update.message.reply_text(
-        "Hey there, you are wonderful. I am not ready yet. Give me some time :)"
-    )
+    user_message = update.message.text
+    if user_message is None:
+        return
+
+    await update.message.chat.send_action("typing")
+
+    try:
+        response = await ollama.generate(
+            prompt=user_message,
+            system_prompt="You are a helpful AI assistant named Panda. Keep responses concise and friendly.",
+        )
+        await update.message.reply_text(response)
+    except Exception as e:
+        await update.message.reply_text(f"Sorry, I encountered an error: {e}")
 
 
 def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
     print("Bot is running...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
