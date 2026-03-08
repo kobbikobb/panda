@@ -7,6 +7,8 @@ RUN pip install uv
 
 COPY . .
 
+RUN chmod +x entrypoint.sh
+
 RUN uv sync --frozen
 
-CMD ["uv", "run", "python", "main.py"]
+CMD ["sh", "entrypoint.sh", "uv", "run", "python", "main.py"]
