@@ -3,6 +3,10 @@ import os
 import httpx
 
 
+class OllamaError(Exception):
+    pass
+
+
 class OllamaClient:
     def __init__(
         self,
@@ -23,11 +27,22 @@ class OllamaClient:
         if system_prompt:
             payload["system"] = system_prompt
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/api/generate",
-                json=payload,
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data.get("response", "")
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    f"{self.base_url}/api/generate",
+                    json=payload,
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("response", "")
+        except httpx.ConnectError as e:
+            raise OllamaError(f"Failed to connect to Ollama at {self.base_url}") from e
+        except httpx.TimeoutException as e:
+            raise OllamaError(f"Request to Ollama timed out after {self.timeout}s") from e
+        except httpx.HTTPStatusError as e:
+            raise OllamaError(
+                f"Ollama returned error: {e.response.status_code} - {e.response.text}"
+            ) from e
+        except Exception as e:
+            raise OllamaError(f"Unexpected error calling Ollama: {e}") from e

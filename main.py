@@ -1,3 +1,4 @@
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -10,7 +11,13 @@ from telegram.ext import (
     filters,
 )
 
-from ollama_client import OllamaClient
+from ollama_client import OllamaClient, OllamaError
+
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -48,8 +55,18 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             system_prompt="You are a helpful AI assistant named Panda. Keep responses concise and friendly.",
         )
         await update.message.reply_text(response)
+    except OllamaError as e:
+        logger.error(f"Ollama error: {e}")
+        await update.message.reply_text(
+            "Sorry, I'm having trouble connecting to the AI service. Please try again later."
+        )
     except Exception as e:
-        await update.message.reply_text(f"Sorry, I encountered an error: {e}")
+        logger.exception(f"Unexpected error: {e}")
+        await update.message.reply_text("Sorry, I encountered an unexpected error.")
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logger.exception("Exception while handling update:", exc_info=context.error)
 
 
 def main():
@@ -57,8 +74,9 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
+    app.add_error_handler(error_handler)
 
-    print("Bot is running...")
+    logger.info("Bot is starting...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
