@@ -101,6 +101,7 @@ name = "panda"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "httpx" },
     { name = "python-dotenv" },
     { name = "python-telegram-bot" },
 ]
@@ -113,6 +114,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "python-telegram-bot", specifier = ">=22.6" },
 ]
