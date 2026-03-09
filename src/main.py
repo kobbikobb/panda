@@ -18,6 +18,7 @@ from src.llm import OllamaClient
 from src.memory import BufferMemory
 from src.message_handler import create_handlers
 from src.tools import ToolRegistry
+from src.tools.web_search import WebSearchTool
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -39,6 +40,7 @@ def main() -> None:
     llm_client = OllamaClient()
     memory = BufferMemory(max_messages=20)
     tools = ToolRegistry()
+    tools.register(WebSearchTool())
 
     agent = Agent(
         llm_client=llm_client,
