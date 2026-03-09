@@ -6,7 +6,7 @@ import pytest
 
 from src.agent import Agent
 from src.llm import LLMError
-from src.memory import BufferMemory
+from src.memory import BufferMemory, SlidingWindowMemory
 from src.tools import ToolRegistry, ToolResult
 
 
@@ -97,6 +97,25 @@ class TestBufferMemory:
         memory.clear()
 
         assert len(memory.get_context()) == 0
+
+
+class TestSlidingWindowMemory:
+    def test_sliding_window(self):
+        memory = SlidingWindowMemory(max_messages=4)
+        for i in range(6):
+            memory.add("user", f"Message {i}")
+
+        context = memory.get_context()
+        assert len(context) == 4
+        assert context[0].content == "Message 2"
+
+    def test_default_max(self):
+        memory = SlidingWindowMemory()
+        for i in range(15):
+            memory.add("user", f"Message {i}")
+
+        context = memory.get_context()
+        assert len(context) == 10
 
 
 class TestToolRegistry:
