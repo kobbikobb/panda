@@ -13,4 +13,4 @@ RUN chmod +x entrypoint.sh
 
 RUN uv sync --frozen
 
-CMD ["sh", "entrypoint.sh", "uv", "run", "python", "main.py"]
+CMD ["sh", "entrypoint.sh", "uv", "run", "python", "-m", "src.main"]
