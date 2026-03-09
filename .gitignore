@@ -1,5 +1,7 @@
 # Environment
 .env
+bot.log
+"udo pacman -S containerd"
 
 # Python-generated files
 __pycache__/
