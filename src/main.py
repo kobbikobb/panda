@@ -13,8 +13,11 @@ from telegram.ext import (
 )
 
 from src.agent import Agent
+from src.config import get_system_prompt
 from src.llm import OllamaClient
+from src.memory import BufferMemory
 from src.message_handler import create_handlers
+from src.tools import ToolRegistry
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -34,9 +37,14 @@ def _get_token() -> str:
 
 def main() -> None:
     llm_client = OllamaClient()
+    memory = BufferMemory(max_messages=20)
+    tools = ToolRegistry()
+
     agent = Agent(
         llm_client=llm_client,
-        system_prompt="You are a helpful AI assistant named Panda. Keep responses concise and friendly.",
+        memory=memory,
+        tools=tools,
+        system_prompt=get_system_prompt("default"),
     )
     start, chat, error = create_handlers(agent)
 
