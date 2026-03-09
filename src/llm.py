@@ -1,13 +1,40 @@
+"""LLM client abstraction and implementations."""
+
 import os
+from typing import Protocol, runtime_checkable
 
 import httpx
 
 
-class OllamaError(Exception):
+class LLMError(Exception):
+    """Base exception for LLM-related errors."""
+
     pass
 
 
+@runtime_checkable
+class LLMClient(Protocol):
+    """Protocol defining the interface for LLM clients."""
+
+    async def generate(self, prompt: str, system_prompt: str | None = None) -> str:
+        """Generate a response from the LLM.
+
+        Args:
+            prompt: The user prompt.
+            system_prompt: Optional system prompt to set context.
+
+        Returns:
+            The LLM's response as a string.
+
+        Raises:
+            LLMError: If the LLM call fails.
+        """
+        ...
+
+
 class OllamaClient:
+    """Async client for the Ollama API."""
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -37,12 +64,12 @@ class OllamaClient:
                 data = response.json()
                 return data.get("response", "")
         except httpx.ConnectError as e:
-            raise OllamaError(f"Failed to connect to Ollama at {self.base_url}") from e
+            raise LLMError(f"Failed to connect to Ollama at {self.base_url}") from e
         except httpx.TimeoutException as e:
-            raise OllamaError(f"Request to Ollama timed out after {self.timeout}s") from e
+            raise LLMError(f"Request to Ollama timed out after {self.timeout}s") from e
         except httpx.HTTPStatusError as e:
-            raise OllamaError(
+            raise LLMError(
                 f"Ollama returned error: {e.response.status_code} - {e.response.text}"
             ) from e
         except Exception as e:
-            raise OllamaError(f"Unexpected error calling Ollama: {e}") from e
+            raise LLMError(f"Unexpected error calling Ollama: {e}") from e
