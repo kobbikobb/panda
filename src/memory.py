@@ -85,7 +85,7 @@ class SQLiteMemory:
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     chat_id INTEGER PRIMARY KEY,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TEXT DEFAULT (datetime('now'))
                 )
                 """
             )
@@ -96,7 +96,7 @@ class SQLiteMemory:
                     chat_id INTEGER NOT NULL,
                     role TEXT NOT NULL,
                     content TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at TEXT DEFAULT (datetime('now')),
                     FOREIGN KEY (chat_id) REFERENCES users(chat_id)
                 )
                 """
@@ -129,10 +129,12 @@ class SQLiteMemory:
                 """
                 DELETE FROM messages
                 WHERE chat_id = ? AND id NOT IN (
-                    SELECT id FROM messages
-                    WHERE chat_id = ?
-                    ORDER BY created_at DESC
-                    LIMIT ?
+                    WITH ranked AS (
+                        SELECT id, ROW_NUMBER() OVER (ORDER BY id DESC) as rn
+                        FROM messages
+                        WHERE chat_id = ?
+                    )
+                    SELECT id FROM ranked WHERE rn <= ?
                 )
                 """,
                 (chat_id, chat_id, self._max_messages),
