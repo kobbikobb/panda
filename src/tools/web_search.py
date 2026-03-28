@@ -1,5 +1,7 @@
 """Web search tool using DuckDuckGo."""
 
+import asyncio
+
 from ddgs import DDGS
 
 from src.tools import ToolResult
@@ -22,10 +24,9 @@ class WebSearchTool:
 
     async def execute(self, query: str) -> ToolResult:
         try:
-            results = DDGS().text(
-                query,
-                max_results=self._max_results,
-                backend="google",
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(
+                None, lambda: DDGS().text(query, max_results=self._max_results, backend="google")
             )
             if not results:
                 return ToolResult(success=True, result="No search results found.")
