@@ -32,11 +32,12 @@ def create_handlers(agent: Agent) -> tuple[callable, callable, callable]:
         user_message = update.message.text
         if user_message is None:
             return
+        chat_id = update.message.chat.id
 
         await update.message.chat.send_action("typing")
 
         try:
-            response = await agent.process(user_message)
+            response = await agent.process(user_message, chat_id=chat_id)
             await update.message.reply_text(response)
         except LLMError as e:
             logger.error(f"LLM error: {e}")

@@ -23,20 +23,24 @@ class Agent:
         self._tools = tools
         self._system_prompt = system_prompt
 
-    async def process(self, user_message: str) -> str:
-        return await self._execute_loop(user_message)
+    async def process(self, user_message: str, chat_id: int | None = None) -> str:
+        return await self._execute_loop(user_message, chat_id)
 
-    async def _execute_loop(self, user_message: str) -> str:
+    async def _execute_loop(self, user_message: str, chat_id: int | None = None) -> str:
         max_iterations = 3
         tool_results: list[str] = []
 
         for _ in range(max_iterations):
-            full_prompt = self._build_prompt(user_message, tool_results)
+            full_prompt = self._build_prompt(user_message, tool_results, chat_id)
             response = await self._llm_client.generate(prompt=full_prompt)
 
             if self._memory:
-                self._memory.add("user", user_message)
-                self._memory.add("assistant", response)
+                if chat_id is not None:
+                    self._memory.add("user", user_message, chat_id)
+                    self._memory.add("assistant", response, chat_id)
+                else:
+                    self._memory.add("user", user_message)
+                    self._memory.add("assistant", response)
 
             tool_call = self._parse_tool_call(response)
             if not tool_call:
@@ -74,14 +78,19 @@ class Agent:
             return str(result.result)
         return f"Error: {result.error}"
 
-    def _build_prompt(self, user_message: str, tool_results: list[str]) -> str:
+    def _build_prompt(
+        self, user_message: str, tool_results: list[str], chat_id: int | None = None
+    ) -> str:
         parts = []
 
         if self._system_prompt:
             parts.append(self._system_prompt)
 
         if self._memory:
-            context = self._memory.get_context()
+            if chat_id is not None:
+                context = self._memory.get_context(chat_id)
+            else:
+                context = self._memory.get_context()
             if context:
                 conversation = "\n".join(f"{msg.role}: {msg.content}" for msg in context)
                 parts.append(f"Conversation history:\n{conversation}")

@@ -15,7 +15,7 @@ from telegram.ext import (
 from src.agent import Agent
 from src.config import get_system_prompt
 from src.llm import OllamaClient
-from src.memory import BufferMemory
+from src.memory import SQLiteMemory
 from src.message_handler import create_handlers
 from src.tools import ToolRegistry
 from src.tools.web_search import WebSearchTool
@@ -38,7 +38,7 @@ def _get_token() -> str:
 
 def main() -> None:
     llm_client = OllamaClient()
-    memory = BufferMemory(max_messages=20)
+    memory = SQLiteMemory(max_messages=20)
     tools = ToolRegistry()
     tools.register(WebSearchTool())
 
