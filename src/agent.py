@@ -7,7 +7,7 @@ import re
 
 from src.llm import LLMClient
 from src.memory import Memory
-from src.tools import ToolRegistry
+from src.tool_registry import ToolRegistry
 
 
 class Agent:

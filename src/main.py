@@ -17,7 +17,7 @@ from src.config import get_system_prompt
 from src.llm import OllamaClient
 from src.memory import SQLiteMemory
 from src.message_handler import create_handlers
-from src.tools import ToolRegistry
+from src.tool_registry import ToolRegistry
 from src.tools.web_search import WebSearchTool
 
 logging.basicConfig(

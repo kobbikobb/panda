@@ -2,7 +2,7 @@
 
 from ddgs import DDGS
 
-from src.tools import ToolResult
+from src.tool_registry import ToolResult
 
 
 class WebSearchTool:
