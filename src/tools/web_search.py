@@ -1,11 +1,15 @@
 """Web search tool using DuckDuckGo."""
 
 from ddgs import DDGS
+from base import Tool, ToolResult, ToolParams
 
-from src.tool_registry import ToolResult
+class SearchParams(ToolParams):
+    query: str
 
+class WebSearchTool(Tool):
+    def __init__ (self, max_results: int=2):
+        self._max_results = max_results
 
-class WebSearchTool:
     @property
     def name(self) -> str:
         return "web_search"
@@ -17,13 +21,15 @@ class WebSearchTool:
             "Use this when you need up-to-date facts, news, or information not in your training data."
         )
 
-    def __init__(self, max_results: int = 2):
-        self._max_results = max_results
+    @property
+    def params_class(self) -> type[ToolParams]:
+        return SearchParams
 
-    async def execute(self, query: str) -> ToolResult:
+    async def execute(self, params: ToolParams) -> ToolResult:
+        assert isinstance(params, SearchParams)
         try:
             results = DDGS().text(
-                query,
+                params.query,
                 max_results=self._max_results,
                 backend="google",
             )
@@ -38,6 +44,6 @@ class WebSearchTool:
                     f"  {r.get('body', 'No description')[:200]}"
                 )
 
-            return ToolResult(success=True, result="\n\n".join(formatted))
+            return ToolResult.ok(result="\n\n".join(formatted))
         except Exception as e:
-            return ToolResult(success=False, result=None, error=str(e))
+            return ToolResult.fail(error=str(e))
