@@ -3,6 +3,8 @@
 Keep comments lean. Code should speak for itself.
 """
 
+import re
+
 from src.llm import LLMClient
 from src.memory import Memory
 from src.tools import ToolRegistry
@@ -22,16 +24,57 @@ class Agent:
         self._system_prompt = system_prompt
 
     async def process(self, user_message: str) -> str:
-        full_prompt = self._build_prompt(user_message)
-        response = await self._llm_client.generate(prompt=full_prompt)
+        return await self._execute_loop(user_message)
 
-        if self._memory:
-            self._memory.add("user", user_message)
-            self._memory.add("assistant", response)
+    async def _execute_loop(self, user_message: str) -> str:
+        max_iterations = 3
+        tool_results: list[str] = []
 
-        return response
+        for _ in range(max_iterations):
+            full_prompt = self._build_prompt(user_message, tool_results)
+            response = await self._llm_client.generate(prompt=full_prompt)
 
-    def _build_prompt(self, user_message: str) -> str:
+            if self._memory:
+                self._memory.add("user", user_message)
+                self._memory.add("assistant", response)
+
+            tool_call = self._parse_tool_call(response)
+            if not tool_call:
+                return response
+
+            result = await self._execute_tool(tool_call["name"], tool_call["args"])
+            tool_results.append(f"Tool: {tool_call['name']}\nResult: {result}")
+
+        return "I'm sorry, I couldn't complete that request. Please try again."
+
+    def _parse_tool_call(self, response: str) -> dict | None:
+        pattern = r'<invoke name="(\w+)">(.*?)</invoke>'
+        match = re.search(pattern, response, re.DOTALL)
+        if not match:
+            return None
+
+        tool_name = match.group(1)
+        args = {}
+        arg_pattern = r'<parameter name="(\w+)">(.*?)</parameter>'
+        for arg_match in re.finditer(arg_pattern, match.group(2)):
+            args[arg_match.group(1)] = arg_match.group(2).strip()
+
+        return {"name": tool_name, "args": args}
+
+    async def _execute_tool(self, name: str, args: dict) -> str:
+        if not self._tools:
+            return "No tools available."
+
+        tool = self._tools.get(name)
+        if not tool:
+            return f"Tool '{name}' not found."
+
+        result = await tool.execute(**args)
+        if result.success:
+            return str(result.result)
+        return f"Error: {result.error}"
+
+    def _build_prompt(self, user_message: str, tool_results: list[str]) -> str:
         parts = []
 
         if self._system_prompt:
@@ -47,6 +90,9 @@ class Agent:
             tools_prompt = self._tools.get_tools_prompt()
             if tools_prompt:
                 parts.append(tools_prompt)
+
+        for tr in tool_results:
+            parts.append(f"Tool result:\n{tr}")
 
         parts.append(f"User: {user_message}")
         return "\n\n".join(parts)

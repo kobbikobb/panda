@@ -1,6 +1,6 @@
 """Tests for the Agent module."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -8,6 +8,7 @@ from src.agent import Agent
 from src.llm import LLMError
 from src.memory import BufferMemory, SlidingWindowMemory
 from src.tools import ToolRegistry, ToolResult
+from src.tools.web_search import WebSearchTool
 
 
 class MockLLMClient:
@@ -150,3 +151,150 @@ class TestToolRegistry:
 
         assert len(tools) == 1
         assert tools[0]["name"] == "test_tool"
+
+
+class TestParseToolCall:
+    def test_parse_tool_call_valid(self):
+        mock_llm = MockLLMClient(response="test")
+        agent = Agent(llm_client=mock_llm)
+
+        response = 'Here is a tool call:\n<invoke name="bash">\n<parameter name="command">ls -la</parameter>\n</invoke>'
+
+        result = agent._parse_tool_call(response)
+
+        assert result is not None
+        assert result["name"] == "bash"
+        assert result["args"]["command"] == "ls -la"
+
+    def test_parse_tool_call_no_match(self):
+        mock_llm = MockLLMClient(response="test")
+        agent = Agent(llm_client=mock_llm)
+
+        response = "Just a regular response without tools"
+
+        result = agent._parse_tool_call(response)
+
+        assert result is None
+
+    def test_parse_tool_call_multiple_params(self):
+        mock_llm = MockLLMClient(response="test")
+        agent = Agent(llm_client=mock_llm)
+
+        response = (
+            '<invoke name="web_search">\n<parameter name="query">python</parameter>\n</invoke>'
+        )
+
+        result = agent._parse_tool_call(response)
+
+        assert result is not None
+        assert result["name"] == "web_search"
+        assert result["args"]["query"] == "python"
+
+
+class TestExecuteTool:
+    @pytest.mark.asyncio
+    async def test_execute_tool_success(self):
+        mock_llm = MockLLMClient(response="test")
+        registry = ToolRegistry()
+
+        class DummyTool:
+            name = "dummy"
+            description = "A dummy tool"
+
+            async def execute(self, **kwargs) -> ToolResult:
+                return ToolResult(success=True, result="executed")
+
+        registry.register(DummyTool())
+        agent = Agent(llm_client=mock_llm, tools=registry)
+
+        result = await agent._execute_tool("dummy", {"arg1": "value"})
+
+        assert result == "executed"
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_not_found(self):
+        mock_llm = MockLLMClient(response="test")
+        registry = ToolRegistry()
+
+        class DummyTool:
+            name = "dummy"
+            description = "A dummy tool"
+
+            async def execute(self, **kwargs) -> ToolResult:
+                return ToolResult(success=True, result="executed")
+
+        registry.register(DummyTool())
+        agent = Agent(llm_client=mock_llm, tools=registry)
+
+        result = await agent._execute_tool("nonexistent", {})
+
+        assert "not found" in result
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_error(self):
+        mock_llm = MockLLMClient(response="test")
+        registry = ToolRegistry()
+
+        class DummyTool:
+            name = "dummy"
+            description = "A dummy tool"
+
+            async def execute(self, **kwargs) -> ToolResult:
+                return ToolResult(success=False, result=None, error="Something went wrong")
+
+        registry.register(DummyTool())
+        agent = Agent(llm_client=mock_llm, tools=registry)
+
+        result = await agent._execute_tool("dummy", {})
+
+        assert "Error:" in result
+
+
+class TestWebSearchTool:
+    @pytest.mark.asyncio
+    async def test_web_search_success(self):
+        tool = WebSearchTool()
+
+        with patch("src.tools.web_search.DDGS") as mock_ddgs:
+            mock_instance = MagicMock()
+            mock_instance.text.return_value = [
+                {
+                    "title": "Python",
+                    "url": "https://python.org",
+                    "body": "Python programming language",
+                }
+            ]
+            mock_ddgs.return_value = mock_instance
+
+            result = await tool.execute("python")
+
+            assert result.success is True
+            assert "Python" in result.result
+
+    @pytest.mark.asyncio
+    async def test_web_search_no_results(self):
+        tool = WebSearchTool()
+
+        with patch("src.tools.web_search.DDGS") as mock_ddgs:
+            mock_instance = MagicMock()
+            mock_instance.text.return_value = []
+            mock_ddgs.return_value = mock_instance
+
+            result = await tool.execute("nonexistent query")
+
+            assert result.success is True
+            assert "No search results" in result.result
+
+    @pytest.mark.asyncio
+    async def test_web_search_error(self):
+        tool = WebSearchTool()
+
+        with patch("src.tools.web_search.DDGS") as mock_ddgs:
+            mock_instance = MagicMock()
+            mock_instance.text.side_effect = Exception("Network error")
+            mock_ddgs.return_value = mock_instance
+
+            result = await tool.execute("test")
+
+            assert result.success is False
+            assert "Network error" in result.error
